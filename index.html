@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080c14">
+    <meta
+      name="description"
+      content="A transparent project index of recent public reports about cooperation and care."
+    >
+    <title>How close are we to world unity?</title>
+    <link rel="stylesheet" href="styles.css">
+    <script
+      src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"
+      crossorigin=""
+      defer
+    ></script>
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <div class="globe-backdrop" aria-hidden="true">
+      <div
+        id="connection-map"
+        role="application"
+        aria-label="Interactive satellite globe. Drag to rotate and use the mouse wheel or pinch to zoom. Pins show where report locations were recognized."
+      ></div>
+      <p class="map-load-status" id="map-load-status" role="status">
+        Loading satellite globe…
+      </p>
+      <p class="globe-credit">
+        Blue Marble imagery ·
+        <a href="https://github.com/vasturiano/three-globe" target="_blank" rel="noopener noreferrer">three-globe</a>
+      </p>
+    </div>
+    <div class="backdrop-shade" aria-hidden="true"></div>
+
+    <main class="app-shell">
+      <section class="sticky-hero" aria-label="World unity index and place search">
+        <header class="info-header">
+          <div class="title-block">
+            <p class="info-eyebrow">A live index · public reports · rolling 24 hours</p>
+            <h1 class="page-title">HOW CLOSE ARE WE TO WORLD UNITY?</h1>
+          </div>
+          <div class="hero-actions">
+            <div class="live-indicator" id="live-indicator" data-state="loading">
+              <span class="live-dot" aria-hidden="true"></span>
+              <span id="live-label">CONNECTING TO PUBLIC FEEDS</span>
+            </div>
+            <button
+              class="pause-button"
+              id="pause-map"
+              type="button"
+              aria-label="Pause globe rotation"
+              aria-pressed="false"
+            >
+              <span aria-hidden="true">Ⅱ</span>
+              <span class="visually-hidden">Pause globe rotation</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="score-card" aria-live="polite" aria-atomic="true">
+          <p class="score-label">Project index</p>
+          <div class="score-line">
+            <span class="score-number" id="score-number">8.4200</span>
+            <span class="score-change" id="score-change">+0.000000000%</span>
+          </div>
+          <p class="score-caption" id="score-caption">
+            Baseline 8.4200% · the score shifts only after qualifying report volume accumulates.
+          </p>
+          <div
+            class="progress-track"
+            id="progress-track"
+            role="progressbar"
+            aria-label="Unity index"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="8.420000000"
+            aria-valuetext="8.420000000 percent"
+          >
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <div class="score-meta">
+            <span class="poll-status" id="poll-status" aria-live="polite">CHECKING</span>
+            <span id="last-updated">Waiting for feed update</span>
+          </div>
+        </section>
+
+        <form class="place-search-form" id="place-search-form" role="search">
+          <label class="visually-hidden" for="place-search">Search a place or address</label>
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            id="place-search"
+            name="place"
+            type="search"
+            placeholder="Search a place or address"
+            autocomplete="off"
+            maxlength="200"
+            aria-controls="place-search-results"
+            aria-describedby="place-search-status place-search-attribution"
+          >
+          <button type="submit">Search</button>
+          <p class="place-search-status" id="place-search-status" role="status" aria-live="polite"></p>
+          <p class="place-search-attribution" id="place-search-attribution">
+            Place search by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
+          </p>
+          <ol class="place-search-results" id="place-search-results" aria-label="Place search results"></ol>
+        </form>
+      </section>
+
+      <section class="activity-panel glass-panel" aria-labelledby="activity-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker"><span class="terminal-light" aria-hidden="true"></span> LIVE INTERNATIONAL TERMINAL FEED</p>
+            <h2 id="activity-title">Why it moved</h2>
+            <p>Qualifying reports · individual items do not directly move the score</p>
+          </div>
+          <span class="section-aside">Auto-updating · 30 sec · UTC</span>
+        </div>
+        <ol
+          class="ticker-list"
+          id="ticker-list"
+          aria-label="Latest live public feed events"
+          aria-live="polite"
+          aria-relevant="additions"
+        >
+          <li class="ticker-empty">Waiting for current reports from configured public feeds…</li>
+        </ol>
+      </section>
+
+      <section class="globe-controls glass-panel" aria-label="Globe controls">
+        <div class="map-legend" aria-label="Select a region to focus the globe">
+          <button type="button" data-region="americas" aria-pressed="false">Americas</button>
+          <button type="button" data-region="europe" aria-pressed="false">Europe</button>
+          <button type="button" data-region="africa" aria-pressed="false">Africa</button>
+          <button type="button" data-region="asia" aria-pressed="false">Asia</button>
+          <button type="button" data-region="oceania" aria-pressed="false">Oceania</button>
+        </div>
+        <div class="signal-controls" aria-label="Map signal layers">
+          <label class="signal-control" for="signal-community">
+            <span class="signal-name"><i class="signal-dot"></i>Community</span>
+            <input id="signal-community" type="range" min="0" max="100" value="100" data-signal-layer="micro-good-deed" aria-label="Community signal visibility">
+            <output for="signal-community">100%</output>
+          </label>
+          <label class="signal-control" for="signal-major">
+            <span class="signal-name"><i class="signal-dot"></i>Major stories</span>
+            <input id="signal-major" type="range" min="0" max="100" value="100" data-signal-layer="major-news" aria-label="Major story signal visibility">
+            <output for="signal-major">100%</output>
+          </label>
+          <label class="signal-control" for="signal-milestone">
+            <span class="signal-name"><i class="signal-dot"></i>Treaties</span>
+            <input id="signal-milestone" type="range" min="0" max="100" value="100" data-signal-layer="global-milestone" aria-label="Treaty signal visibility">
+            <output for="signal-milestone">100%</output>
+          </label>
+        </div>
+        <p class="globe-disclaimer">
+          Lines are schematic links inferred from report text, not verified routes.
+        </p>
+      </section>
+
+      <section class="metric-strip glass-panel" aria-label="Live summary metrics">
+        <article class="metric-cell">
+          <p class="metric-label">Treaty-related reports</p>
+          <p class="metric-value" id="accord-count">—</p>
+          <p class="metric-note" id="accord-note">Keyword matches · not verified accords</p>
+        </article>
+        <article class="metric-cell">
+          <p class="metric-label">CO₂ reduction</p>
+          <p class="metric-value metric-unavailable" id="co2-value">—</p>
+          <p class="metric-note" id="co2-note">No verified live CO₂ measure in these feeds</p>
+        </article>
+        <article class="metric-cell">
+          <p class="metric-label">Index</p>
+          <p class="metric-value" id="peace-score">8.4200%</p>
+          <p class="metric-note">Project-set and not independently measured</p>
+        </article>
+      </section>
+
+      <section class="source-status" aria-label="Public source status" aria-live="polite">
+        <div class="source-chip" id="source-news" data-state="loading">
+          <span class="source-dot" aria-hidden="true"></span>
+          <span class="source-name">Google News RSS · AP/Reuters query</span>
+          <span class="source-state">CONNECTING</span>
+        </div>
+        <div class="source-chip" id="source-uplifting" data-state="loading">
+          <span class="source-dot" aria-hidden="true"></span>
+          <span class="source-name">r/UpliftingNews</span>
+          <span class="source-state">CONNECTING</span>
+        </div>
+        <div class="source-chip" id="source-kindness" data-state="loading">
+          <span class="source-dot" aria-hidden="true"></span>
+          <span class="source-name">r/RandomActsOfKindness</span>
+          <span class="source-state">CONNECTING</span>
+        </div>
+        <div class="source-chip" id="source-assistance" data-state="loading">
+          <span class="source-dot" aria-hidden="true"></span>
+          <span class="source-name">r/Assistance</span>
+          <span class="source-state">CONNECTING</span>
+        </div>
+      </section>
+
+      <section class="philosophy-panel glass-panel" aria-labelledby="philosophy-title">
+        <header class="content-section-heading">
+          <p class="section-kicker">THE MODEL</p>
+          <h2 id="philosophy-title">Core Philosophy &amp; Objective Matrix</h2>
+          <p>What this measure can—and cannot—tell us about cooperation at planetary scale.</p>
+        </header>
+        <div class="philosophy-grid">
+          <article class="philosophy-section">
+            <span class="about-section-number">01</span>
+            <h3>What is this counter?</h3>
+            <p>
+              World unity is a continuing journey toward global cooperation,
+              collective action, and shared human prosperity—not a single
+              centralized state. This index tracks a narrow stream of public
+              reports that match cooperation criteria; it is not a census of
+              humanity or a direct measure of how united people feel.
+            </p>
+          </article>
+          <article class="philosophy-section">
+            <span class="about-section-number">02</span>
+            <h3>Is absolute world unity genuinely possible?</h3>
+            <p>
+              Political divisions and conflict are real. Yet people already
+              cooperate across borders through shared science, public health,
+              trade, communications, and humanitarian response. These are
+              meaningful forms of functional unity, without implying that
+              disagreement or inequality has disappeared.
+            </p>
+          </article>
+          <article class="philosophy-section">
+            <span class="about-section-number">03</span>
+            <h3>How to contribute</h3>
+            <ul>
+              <li>Support reputable international charities and local groups serving diverse communities.</li>
+              <li>Build cross-cultural understanding through listening and communication.</li>
+              <li>Join open research or citizen-science projects that share knowledge globally.</li>
+            </ul>
+          </article>
+          <details class="methodology">
+            <summary>Scoring, sources and limitations</summary>
+            <div class="methodology-content">
+              <p>
+                The starting index is a project-set 8.4200%, not a measured
+                historical estimate. Qualifying reports add volume units (1
+                for community/public good, 10 for institutional cooperation,
+                100 for qualifying treaties). Every 1,000 units, rounded-down
+                cumulative volume is used in the logarithmic curve:
+                0.0100% × log₂(1 + rounded volume / 100,000). At 100,000
+                community report units, the cumulative change is +0.0100%.
+                Reports are keyword-filtered, not independently verified acts.
+              </p>
+              <p>
+                Google News RSS is queried for AP and Reuters coverage; it is
+                an aggregator, not a direct wire feed. Community items come
+                from Reddit. Updates are checked every 30 seconds, but
+                upstream publication and provider delays mean this is not a
+                second-by-second global monitor. Source URLs are supplied by
+                feeds and are not independently authenticated by this project.
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="story-panel glass-panel" aria-labelledby="story-title">
+        <header class="content-section-heading">
+          <p class="section-kicker">THE PERSON BEHIND THE PROJECT</p>
+          <h2 id="story-title">My Story: Why I Started This Project</h2>
+          <p>A personal note about the question that started this work.</p>
+        </header>
+        <article class="story-card">
+          <div class="story-mark" aria-hidden="true">●</div>
+          <div class="story-copy">
+            <h3>Your story begins here</h3>
+            <p class="story-placeholder">
+              Add your own introduction: what made you wonder how close we are
+              to world unity, and what you hope this project can help people
+              see.
+            </p>
+            <p class="story-placeholder">
+              You can share the choices behind building a careful, uninflated
+              tracker—and the experiences or questions that shaped your
+              perspective. Replace this placeholder with your own words when
+              you are ready.
+            </p>
+          </div>
+        </article>
+      </section>
+
+      <footer class="page-footer">
+        <span>Public feeds · Browser-local tally · No analytics</span>
+        <span>Satellite imagery · Blue Marble</span>
+      </footer>
+    </main>
+  </body>
+</html>
