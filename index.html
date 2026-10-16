@@ -10,11 +10,7 @@
     >
     <title>How close are we to world unity?</title>
     <link rel="stylesheet" href="styles.css">
-    <script
-      src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"
-      crossorigin=""
-      defer
-    ></script>
+    <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js" defer></script>
     <script src="script.js" defer></script>
   </head>
   <body>
@@ -24,9 +20,7 @@
         role="application"
         aria-label="Interactive satellite globe. Drag to rotate and use the mouse wheel or pinch to zoom. Pins show where report locations were recognized."
       ></div>
-      <p class="map-load-status" id="map-load-status" role="status">
-        Loading satellite globe…
-      </p>
+
       <p class="globe-credit">
         Blue Marble imagery ·
         <a href="https://github.com/vasturiano/three-globe" target="_blank" rel="noopener noreferrer">three-globe</a>
@@ -62,8 +56,9 @@
         <section class="score-card" aria-live="polite" aria-atomic="true">
           <p class="score-label">Project index</p>
           <div class="score-line">
-            <span class="score-number" id="score-number">8.4200</span>
-            <span class="score-change" id="score-change">+0.000000000%</span>
+            <span class="score-number" id="score-number">8.420000</span>
+            <span class="percent-sign">%</span>
+            <span class="score-change" id="delta-number">+0.000000%</span>
           </div>
           <p class="score-caption" id="score-caption">
             Baseline 8.4200% · the score shifts only after qualifying report volume accumulates.
@@ -82,7 +77,7 @@
           </div>
           <div class="score-meta">
             <span class="poll-status" id="poll-status" aria-live="polite">CHECKING</span>
-            <span id="last-updated">Waiting for feed update</span>
+            <span id="last-updated">Loading live stream...</span>
           </div>
         </section>
 
@@ -108,7 +103,7 @@
         </form>
       </section>
 
-      <section class="activity-panel glass-panel" aria-labelledby="activity-title">
+      <section class="activity-panel" aria-labelledby="activity-title">
         <div class="section-heading">
           <div>
             <p class="section-kicker"><span class="terminal-light" aria-hidden="true"></span> LIVE INTERNATIONAL TERMINAL FEED</p>
@@ -124,11 +119,11 @@
           aria-live="polite"
           aria-relevant="additions"
         >
-          <li class="ticker-empty">Waiting for current reports from configured public feeds…</li>
+          <li class="ticker-empty">Loading global kindness stream...</li>
         </ol>
       </section>
 
-      <section class="globe-controls glass-panel" aria-label="Globe controls">
+      <section class="globe-controls" aria-label="Globe controls">
         <div class="map-legend" aria-label="Select a region to focus the globe">
           <button type="button" data-region="americas" aria-pressed="false">Americas</button>
           <button type="button" data-region="europe" aria-pressed="false">Europe</button>
@@ -158,7 +153,7 @@
         </p>
       </section>
 
-      <section class="metric-strip glass-panel" aria-label="Live summary metrics">
+      <section class="metric-strip" aria-label="Live summary metrics">
         <article class="metric-cell">
           <p class="metric-label">Treaty-related reports</p>
           <p class="metric-value" id="accord-count">—</p>
@@ -197,9 +192,19 @@
           <span class="source-name">r/Assistance</span>
           <span class="source-state">CONNECTING</span>
         </div>
+        <div class="source-chip" id="source-smile" data-state="loading">
+          <span class="source-dot" aria-hidden="true"></span>
+          <span class="source-name">r/MadeMeSmile</span>
+          <span class="source-state">CONNECTING</span>
+        </div>
+        <div class="source-chip" id="source-charity" data-state="loading">
+          <span class="source-dot" aria-hidden="true"></span>
+          <span class="source-name">r/Charity</span>
+          <span class="source-state">CONNECTING</span>
+        </div>
       </section>
 
-      <section class="philosophy-panel glass-panel" aria-labelledby="philosophy-title">
+      <section class="philosophy-panel" aria-labelledby="philosophy-title">
         <header class="content-section-heading">
           <p class="section-kicker">THE MODEL</p>
           <h2 id="philosophy-title">Core Philosophy &amp; Objective Matrix</h2>
@@ -263,7 +268,7 @@
         </div>
       </section>
 
-      <section class="story-panel glass-panel" aria-labelledby="story-title">
+      <section class="story-panel" aria-labelledby="story-title">
         <header class="content-section-heading">
           <p class="section-kicker">THE PERSON BEHIND THE PROJECT</p>
           <h2 id="story-title">My Story: Why I Started This Project</h2>

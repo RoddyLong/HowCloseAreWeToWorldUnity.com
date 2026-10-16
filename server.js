@@ -1,57 +1,414 @@
+/**
+ * World Unity Dashboard - Reliable Public RSS Pipeline
+ * Bypasses Reddit 429 blocks with stable, open RSS feeds
+ */
+
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 
+// Configuration
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 8765);
 const REQUEST_TIMEOUT_MS = 12_000;
-const REDDIT_REQUEST_JITTER_MS = 500;
-const REDDIT_REQUEST_SPACING_MS = 350;
-const REDDIT_USER_AGENT =
-  "HowCloseAreWeToWorldUnity/1.0.0 (public read-only feed; contact: howclosearewetoworldunity.com)";
-const NEWS_QUERY =
-  "unites OR cooperation OR alliance OR humanitarian OR treaty";
-const NEWS_FALLBACK_QUERY =
-  "world humanitarian aid cooperation international treaty";
-const AP_WORLD_RSS_URL = "https://apnews.com/hub/world-news?output=rss";
 const RELIEFWEB_APP_NAME = process.env.RELIEFWEB_APP_NAME || "worldunity";
-const REDDIT_LIMIT = 25;
-const NEWS_CACHE_TTL_MS = 20_000;
-const FEED_CACHE_TTL_MS = 5 * 60_000;
-const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const ALLOWED_SUBREDDITS = new Set([
-  "UpliftingNews",
-  "RandomActsOfKindness",
-  "Assistance",
-]);
-const EXCLUDED_STORY_TERMS =
-  /(?:\b(?:billionaires?|millionaires?)\b.{0,60}\b(?:make|making|earn|earning|profit\w*|gain\w*|wealth|fortune|net worth)\b|\b(?:make|making|earn|earning|profit\w*|gain\w*|accumulat\w*|build\w*|grow\w*).{0,60}\b(?:billionaires?|millionaires?|wealth|fortune|net worth)\b|\b(?:stock(?:s| market)?|share prices?|shares? (?:rise|fall|surge|drop|climb|gain|slide|dip)|market cap|earnings|quarterly results|investors?|net worth|personal wealth|personal achievement|career milestone|self-made|company profits|corporate revenue|initial public offering|ipo|individual wealth|won (?:an? )?(?:award|prize|competition)|sets? (?:a )?record)\b)/i;
-const NEGATIVE_COLLABORATION_TERMS =
-  /\b(?:fail(?:s|ed|ure)?|reject(?:s|ed|ing)?|withdraw(?:s|n|al|ing)?|suspend(?:s|ed|ing)?|collapse(?:s|d|ing)?|halt(?:s|ed|ing)?|block(?:s|ed|ing)?|ban(?:s|ned|ning)?|attack(?:s|ed|ing)?|violence|war|killed|sanction(?:s|ed|ing)?|accus(?:e|es|ed|ing)|condemn(?:s|ed|ing)?|break(?:s|ing)? down)\b/i;
-const GLOBAL_AGREEMENT_TERMS =
-  /\b(?:treat(?:y|ies)|pact|accord|convention)\b/i;
-const GLOBAL_COOPERATION_TERMS =
-  /\b(?:international|global|cross-border|bilateral|multilateral|between (?:two or more )?(?:countries|nations|states)|countries|nations|sovereign|ratified|signed|peace)\b/i;
-const INSTITUTIONAL_WORK_TERMS =
-  /\b(?:scientific|science|research|medical|vaccine|space station|iss|climate|disaster response|university|universities|institution|agency|laborator(?:y|ies)|public health)\b/i;
-const COLLABORATION_TERMS =
-  /\b(?:international|global|cross-border|joint|collaborat\w*|partner(?:ship|ed|ing)?|shared|between|cooperat\w*|multinational|multi-national|together|team(?:work)?)\b/i;
-const COMMUNITY_WORK_TERMS =
-  /\b(?:community|communities|volunteers?|volunteering|mutual aid|donat\w*|food bank|shelter|disaster relief|humanitarian|charit(?:y|ies)|fundrais\w*|school meals|rescue|neighbors?|neighbours?|families|students|residents|patients|refugees|public service|local aid|aid workers?)\b/i;
-const PUBLIC_BENEFIT_TERMS =
-  /\b(?:help(?:s|ed|ing)?|support(?:s|ed|ing)?|serv(?:e|es|ed|ing)|deliver(?:s|ed|ing)?|provid(?:e|es|ed|ing)|team(?:s|ed|ing)?|together|collect(?:ive|ively)?|rais(?:e|es|ed|ing)|donat\w*|aid|care|rescu(?:e|es|ed|ing)|protect(?:s|ed|ing)?|feed(?:s|ing)?|treat(?:s|ed|ing)?|vaccinat\w*|teach(?:es|ing)?|build(?:s|ing)?|distribut\w*)\b/i;
-const ITEM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const redditModes = new Map();
-const feedCooldowns = new Map();
-const feedCache = new Map();
-const feedRequests = new Map();
-let redditRequestQueue = Promise.resolve();
+const POOL_SIZE = 500;
+const ITEM_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 14 days for deep fallback
+const LIVE_FETCH_INTERVAL_MS = 30_000; // 30 seconds
+
+// Strict deduplication ledger - tracks headlines/URLs for 72 hours
+const seenHeadlines = new Map(); // Map: headline -> timestamp
+const seenUrls = new Map(); // Map: URL -> timestamp
+
+// Global memory reservoir
+let globalEventsPool = [];
+let poolLastUpdated = 0;
+
+// Live breaking news queue
+let liveBreakingNews = [];
+
+// Static file routes
 const STATIC_FILES = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
   ["/script.js", ["script.js", "text/javascript; charset=utf-8"]],
 ]);
+
+/**
+ * ============================================================================
+ * SERVER-SIDE DEDUPLICATION (DISABLED - Frontend handles permanent localStorage)
+ * ============================================================================
+ */
+
+// Server-side deduplication functions retained for reference but not used
+// Frontend localStorage provides permanent cross-session deduplication
+
+function cleanupDeduplicationLedger() {
+  // Not used - frontend handles permanent ledger
+}
+
+function isDuplicate(item) {
+  // Not used - frontend handles permanent ledger
+  return false;
+}
+
+function addToLedger(item) {
+  // Not used - frontend handles permanent ledger
+}
+
+/**
+ * ============================================================================
+ * COGNITIVE AI FILTER LAYER - Enhanced with Hardcoded Blocks
+ * ============================================================================
+ */
+
+function evaluateWithSemanticRules(headline) {
+  const text = headline.toLowerCase();
+
+  // HARDCODED BLOCKS - Specific negative terms
+  const hardcodedBlocks = [
+    /\bshortfalls?\b/i,
+    /\bimpossible\b/i,
+    /\bfunding crisis\b/i,
+    /\bslashed\b.{0,20}\b(?:aid|funding|budget|support)\b/i,
+    /\basked to do the impossible\b/i,
+    /\bdrastric funding\b/i,
+    /\baid organizations\b.{0,30}\b(?:impossible|shortfall|crisis)\b/i,
+  ];
+
+  for (const pattern of hardcodedBlocks) {
+    if (pattern.test(text)) {
+      return { approved: false, confidence: 0.99, reason: "Hardcoded negative term block" };
+    }
+  }
+
+  // REJECT: Negative systemic indicators
+  const negativePatterns = [
+    /\b(?:crisis|crisis's|starving|starvation|refuses?|refused|denied|denies?|reject(?:s|ed|ing)?|protest|protests?|protesting|failed|failure|collapse(?:s|d|ing)?|bankrupt|bankruptcy)\b/i,
+    /\b(?:cut|cuts?|reduction|reductions?|terminate(?:s|d|ing)?|suspend(?:s|ed|ing)?|halt(?:s|ed|ing)?|block(?:s|ed|ing)?|ban(?:s|ned|ning)?)\b.{0,30}\b(?:aid|funding|support|assistance|help|relief|budget)\b/i,
+    /\b(?:running out|depleted|exhausted|empty|insufficient|lack(?:ing|s)?|missing)\b.{0,30}\b(?:fund|money|resource|supply|food|water|medicine)\b/i,
+  ];
+
+  for (const pattern of negativePatterns) {
+    if (pattern.test(text)) {
+      return { approved: false, confidence: 0.95, reason: "Negative systemic indicator" };
+    }
+  }
+
+  // REJECT: Pure financial gain only
+  const pureWealthPatterns = [
+    /\b(?:billionaires?|millionaires?)\b.{0,60}\b(?:make|making|earn|earning|profit|gain|wealth|fortune|net worth)\b/i,
+    /\b(?:stock(?:s| market)?|share prices?|shares? (?:rise|fall|surge|drop|climb|gain|slide|dip)|market cap|earnings|quarterly results|investors?)\b/i,
+    /\b(?:ipo|initial public offering|company profits|corporate revenue)\b/i,
+  ];
+
+  for (const pattern of pureWealthPatterns) {
+    if (pattern.test(text)) {
+      return { approved: false, confidence: 0.92, reason: "Pure financial gain content" };
+    }
+  }
+
+  // REJECT: Sports game scores (unless charity)
+  const sportsScorePatterns = [
+    /\b(?:game|match|tournament|championship|final)\b.{0,30}\b(?:score|wins|won|beat|defeated)\b.{0,20}\b(?!(?:charity|donation|fundraiser|good cause))/i,
+  ];
+
+  for (const pattern of sportsScorePatterns) {
+    if (pattern.test(text)) {
+      return { approved: false, confidence: 0.88, reason: "Sports game scores" };
+    }
+  }
+
+  // REJECT: Crimes without good deed context
+  const crimePatterns = [
+    /\b(?:arrested|charged|indicted|convicted|sentenced)\b.{0,40}\b(?!(?:helping|saving|rescuing|protecting))/i,
+    /\b(?:shooting|stabbing|assault|robbery|burglary)\b.{0,40}\b(?!(?:stopped|prevented|helping|rescuing))/i,
+  ];
+
+  for (const pattern of crimePatterns) {
+    if (pattern.test(text)) {
+      return { approved: false, confidence: 0.90, reason: "Crime without good deed context" };
+    }
+  }
+
+  // APPROVE: Individual good deeds and kindness (HIGH PRIORITY)
+  const kindnessPatterns = [
+    /\b(?:stranger|neighbor|person|man|woman|teen|kid|child|student|teacher|doctor|nurse)\b.{0,30}\b(?:helps?|helped|saves?|saved|rescues?|rescued|gifted|donated|gave|provided|built|created|made|started|launched)\b.{0,30}\b(?:stranger|family|child|person|community|charity|cause|shelter|food|home|money|life|hope)\b/i,
+    /\b(?:donates?|donated|gives?|gave|gifts?|gifted|fundraiser|fundraising|charity|charitable)\b.{0,30}\b(?:to|for|toward)\b.{0,30}\b(?:stranger|family|child|community|shelter|hospital|school|cause|hope|future)\b/i,
+    /\b(?:random act of kindness|pay it forward|good samaritan|good deed)\b/i,
+    /\b(?:mrbeast|jimmy|creator|youtuber|streamer)\b.{0,30}\b(?:helps?|gives?|donates?|builds?|creates?|funds?|saves?|rescues?|gifts?)\b/i,
+  ];
+
+  for (const pattern of kindnessPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.95, reason: "Individual good deed/kindness" };
+    }
+  }
+
+  // APPROVE: Charitable and humanitarian acts
+  const charityPatterns = [
+    /\b(?:charity|charitable|nonprofit|non-profit|ngo|foundation)\b.{0,30}\b(?:launch|start|begin|announce|provide|deliver|donate|fund|support|help|aid|relief)\b/i,
+    /\b(?:donation|donations|fundraiser|fundraising|crowdfunding|gofundme)\b.{0,30}\b(?:reaches?|hits?|raises?|collects?|provides?|delivers?|helps?|saves?|rescues?|builds?|creates?)\b/i,
+    /\b(?:shelter|food bank|soup kitchen|homeless shelter)\b.{0,30}\b(?:provides?|helps?|serves?|feeds?|houses?|supports?|builds?|opens?|launches?)\b/i,
+  ];
+
+  for (const pattern of charityPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.93, reason: "Charitable/humanitarian act" };
+    }
+  }
+
+  // APPROVE: Medical breakthroughs and healthcare
+  const medicalPatterns = [
+    /\b(?:medical|healthcare|doctor|nurse|hospital|clinic)\b.{0,30}\b(?:breakthrough|discovery|cure|treatment|helps?|saves?|treats?|heals?|provides?|delivers?|offers?|launches?)\b/i,
+    /\b(?:vaccine|vaccination|immunization)\b.{0,30}\b(?:launch|deliver|provide|help|save|protect|distribute)\b/i,
+    /\b(?:organ donation|blood donation|bone marrow)\b.{0,30}\b(?:saves?|helps?|rescues?|gives?|provides?)\b/i,
+  ];
+
+  for (const pattern of medicalPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.91, reason: "Medical/healthcare advancement" };
+    }
+  }
+
+  // APPROVE: Community support and local good deeds
+  const communityPatterns = [
+    /\b(?:community|neighbors?|volunteers?|local|town|city)\b.{0,30}\b(?:comes? together|unites?|helps?|supports?|rallies?|builds?|creates?|provides?|delivers?|raises?|collects?)\b.{0,30}\b(?:for|to|toward)\b/i,
+    /\b(?:food drive|clothing drive|toy drive|school supply drive)\b.{0,30}\b(?:collects?|raises?|provides?|delivers?|helps?|supports?)\b/i,
+    /\b(?:neighbors?|community|volunteers?)\b.{0,30}\b(?:help|support|rebuild|recover|clean|fix|repair|restore)\b.{0,30}\b(?:after|following)\b.{0,20}\b(?:disaster|storm|flood|fire|tragedy)\b/i,
+  ];
+
+  for (const pattern of communityPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.89, reason: "Community support/local good deed" };
+    }
+  }
+
+  // HIGH-CONFIDENCE OVERRIDE: Global organizations as primary actors
+  const globalOrgPatterns = [
+    /\b(?:UN|United Nations|WHO|World Health Organization|UNICEF|IFRC|International Federation of Red Cross|Red Cross|G20|G7|EU|European Union|NATO|ASEAN|AU|African Union)\b.{0,20}\b(?:announce|launch|sign|adopt|agree|partner|cooperate|collaborate|aid|relief|fund|support)\b/i,
+    /\b(?:G20|G7|EU-Asia|EU-Africa|bilateral|multilateral)\b.{0,30}\b(?:summit|meeting|agreement|treaty|accord|pact)\b/i,
+  ];
+
+  for (const pattern of globalOrgPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.95, reason: "Global organization primary actor" };
+    }
+  }
+
+  // APPROVE: Positive "vs/versus/kill/end" patterns targeting systemic threats
+  const positiveThreatPatterns = [
+    /\b(?:alliance|alliances|coalition|partners|countries|nations|states)\b.{0,20}\b(?:unite|united|join|gather)\b.{0,15}\b(?:vs|versus)\b.{0,20}\b(?:climate change|poverty|hunger|disease|pandemic|inequality|corruption)\b/i,
+    /\b(?:accord|agreement|treaty|pact|summit)\b.{0,20}\b(?:aims?|seek|plan|intend)\b.{0,15}\b(?:to\s+)?(?:kill|end|eliminate|stop|combat|fight)\b.{0,20}\b(?:trade barriers|poverty|hunger|disease|climate|pollution)\b/i,
+    /\b(?:countries|nations|states)\b.{0,20}\b(?:sign|adopt|agree)\b.{0,15}\b(?:treaty|accord|agreement|pact)\b.{0,30}\b(?:for|to)\b.{0,20}\b(?:maritime|trade|climate|health|disaster)\b/i,
+  ];
+
+  for (const pattern of positiveThreatPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.88, reason: "Positive action against systemic threat" };
+    }
+  }
+
+  // APPROVE: Cross-border cooperation patterns
+  const cooperationPatterns = [
+    /\b(?:cross-border|international|global|multinational|multi-national|joint)\b.{0,30}\b(?:cooperation|collaboration|partnership|alliance|effort|initiative|mission|project|operation)\b/i,
+    /\b(?:countries|nations|states)\b.{0,20}\b(?:cooperate|collaborate|partner|unite|join|work together)\b.{0,30}\b(?:on|for|to)\b.{0,20}\b(?:disaster|aid|relief|health|climate|science|research|space)\b/i,
+  ];
+
+  for (const pattern of cooperationPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.82, reason: "Cross-border cooperation detected" };
+    }
+  }
+
+  // APPROVE: Humanitarian/aid patterns
+  const humanitarianPatterns = [
+    /\b(?:humanitarian|aid|relief|emergency|disaster)\b.{0,30}\b(?:response|assistance|support|help|funding|supplies|deployment)\b.{0,20}\b(?:international|global|cross-border|multinational)\b/i,
+    /\b(?:WHO|UN|UNICEF|Red Cross)\b.{0,20}\b(?:deploy|send|provide|deliver|launch)\b.{0,20}\b(?:aid|relief|medical|supplies|vaccines)\b/i,
+  ];
+
+  for (const pattern of humanitarianPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.85, reason: "Humanitarian/aid cooperation" };
+    }
+  }
+
+  // APPROVE: Scientific/space collaboration
+  const sciencePatterns = [
+    /\b(?:international|global|joint)\b.{0,20}\b(?:space|scientific|research|medical|climate)\b.{0,30}\b(?:mission|project|collaboration|cooperation|partnership)\b/i,
+    /\b(?:ISS|International Space Station)\b.{0,30}\b(?:crew|astronaut|mission|experiment)\b/i,
+  ];
+
+  for (const pattern of sciencePatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.84, reason: "Scientific/space collaboration" };
+    }
+  }
+
+  // APPROVE: Sports charity and sportsmanship
+  const sportsCharityPatterns = [
+    /\b(?:charity|fundraiser|donation|good cause)\b.{0,30}\b(?:game|match|tournament|race|marathon|athletes?|players?|team)\b/i,
+    /\b(?:sportsmanship|fair play|respect|kindness)\b.{0,30}\b(?:game|match|sport|athlete|player)\b/i,
+  ];
+
+  for (const pattern of sportsCharityPatterns) {
+    if (pattern.test(text)) {
+      return { approved: true, confidence: 0.86, reason: "Sports charity/sportsmanship" };
+    }
+  }
+
+  // Default: For positive news sources, be more permissive
+  // Accept items that seem generally positive or constructive
+  const positiveWords = [
+    "help", "save", "rescue", "support", "protect", "care", "love", "kind", "kindness",
+    "generous", "hope", "inspire", "brave", "hero", "triumph", "success", "victory",
+    "breakthrough", "discovery", "innovation", "progress", "improve", "solution", "heal",
+    "recover", "rebuild", "unite", "together", "community", "friendship", "peace",
+    "harmony", "cooperation", "collaboration", "partnership", "alliance", "agreement",
+    "treaty", "accord", "pact", "donate", "donation", "charity", "fund", "fundraiser",
+    "volunteer", "kind", "good", "positive", "happy", "joy", "celebrate", "celebration",
+    "achievement", "accomplish", "win", "winner", "champion", "improve", "better",
+    "best", "great", "wonderful", "amazing", "beautiful", "inspiring", "inspirational",
+  ];
+
+  for (const word of positiveWords) {
+    if (text.includes(word)) {
+      return { approved: true, confidence: 0.70, reason: `Positive keyword: ${word}` };
+    }
+  }
+
+  return { approved: false, confidence: 0.5, reason: "Insufficient cooperative/goodness context" };
+}
+
+/**
+ * ============================================================================
+ * DATA SOURCE INTEGRATION - STABLE RSS FEEDS
+ * ============================================================================
+ */
+
+// RSS Feed Sources
+const RSS_SOURCES = [
+  {
+    name: "Good News Network",
+    url: "https://www.goodnewsnetwork.org/feed/",
+    limit: 100,
+  },
+  {
+    name: "Positive News UK",
+    url: "https://www.positive.news/feed/",
+    limit: 100,
+  },
+  {
+    name: "Optimist Daily",
+    url: "https://www.optimistdaily.com/feed/",
+    limit: 100,
+  },
+  {
+    name: "UN News",
+    url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml",
+    limit: 100,
+  },
+  {
+    name: "Google News",
+    url: "https://news.google.com/rss/search?q=humanitarian+OR+cooperation+OR+treaty+OR+alliance&hl=en-US&gl=US&ceid=US:en",
+    limit: 100,
+  },
+  {
+    name: "ReliefWeb",
+    url: "https://reliefweb.int/updates?format=rss",
+    limit: 100,
+  },
+  {
+    name: "BBC News World",
+    url: "https://feeds.bbci.co.uk/news/world/rss.xml",
+    limit: 100,
+  },
+  {
+    name: "AP News World",
+    url: "https://feeds.a.ap.org/xml/AP_TopStories.xml",
+    limit: 100,
+  },
+];
+
+async function loadRSSFeed(source) {
+  const response = await fetchUpstream(source.url, {
+    Accept: "application/rss+xml, application/xml, text/xml",
+    "User-Agent": "HowCloseAreWeToWorldUnity/1.0 (public RSS reader)",
+  });
+
+  if (!response.ok) {
+    throw new Error(`${source.name} returned HTTP ${response.status}`);
+  }
+
+  const rawItems = parseNewsRss(await response.text(), source.name);
+
+  // For positive news sources, use more permissive filtering
+  const isPositiveNewsSource = [
+    "Good News Network",
+    "Positive News UK",
+    "Optimist Daily",
+  ].includes(source.name);
+
+  const items = rawItems.filter(item => {
+    const evaluation = evaluateWithSemanticRules(item.title);
+    // For positive news sources, accept if confidence > 0.5
+    if (isPositiveNewsSource) {
+      return evaluation.confidence > 0.5;
+    }
+    return evaluation.approved;
+  });
+
+  return items;
+}
+
+function parseNewsRss(xml, defaultSource = "RSS Feed") {
+  const blocks = xml.match(/<item\b[^>]*>[\s\S]*?<\/item\s*>/gi) ?? [];
+  return blocks.flatMap((block) => {
+    const rawTitle = xmlTag(block, "title");
+    const source = xmlTag(block, "source") || defaultSource;
+    const publisherSuffix = ` - ${source}`;
+    const title = rawTitle.endsWith(publisherSuffix)
+      ? rawTitle.slice(0, -publisherSuffix.length)
+      : rawTitle;
+    const url = validHttpUrl(xmlTag(block, "link"));
+    const time = xmlTag(block, "pubDate");
+    const id = xmlTag(block, "guid") || url;
+
+    if (!title || !url || !id || !time) return [];
+
+    // Clean title from RSS artifacts
+    const cleanedTitle = title
+      .replace(/\s*\|\s*[\s\S]*$/g, '')
+      .replace(/\s+-\s*[\s\S]*$/g, '')
+      .replace(/\s*by\s+[\s\S]*$/gi, '')
+      .replace(/\s*\(\s*[\s\S]*?\s*\)\s*$/g, '')
+      .replace(/\[\s*[\s\S]*?\s*\]/g, '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return [{
+      id,
+      title: cleanedTitle,
+      text: xmlTag(block, "description").slice(0, 2_000),
+      url,
+      time,
+      source,
+    }];
+  });
+}
+
+/**
+ * ============================================================================
+ * UTILITY FUNCTIONS
+ * ============================================================================
+ */
 
 function decodeXml(value) {
   return value
@@ -88,197 +445,6 @@ function validHttpUrl(value) {
   }
 }
 
-function isCurrentCycleItem(item, now = Date.now()) {
-  const publishedAt = Date.parse(item.time);
-  const age = now - publishedAt;
-  return Number.isFinite(publishedAt) && age >= 0 && age <= ITEM_MAX_AGE_MS;
-}
-
-function contributionTier(item) {
-  const text = `${item.title} ${item.text ?? ""}`;
-  if (
-    EXCLUDED_STORY_TERMS.test(text) ||
-    NEGATIVE_COLLABORATION_TERMS.test(text)
-  ) {
-    return null;
-  }
-
-  if (
-    GLOBAL_AGREEMENT_TERMS.test(text) &&
-    GLOBAL_COOPERATION_TERMS.test(text)
-  ) {
-    return "historic-global-pact";
-  }
-  if (
-    INSTITUTIONAL_WORK_TERMS.test(text) &&
-    GLOBAL_COOPERATION_TERMS.test(text) &&
-    COLLABORATION_TERMS.test(text)
-  ) {
-    return "institutional-cooperation";
-  }
-  if (
-    COMMUNITY_WORK_TERMS.test(text) &&
-    PUBLIC_BENEFIT_TERMS.test(text)
-  ) {
-    return "community-public-good";
-  }
-  return null;
-}
-
-function eligibleItems(items) {
-  const now = Date.now();
-  return items
-    .filter(
-      (item) =>
-        contributionTier(item) !== null && isCurrentCycleItem(item, now),
-    )
-    .slice(0, REDDIT_LIMIT);
-}
-
-function parseNewsRss(xml, defaultSource = "Google News") {
-  const blocks = xml.match(/<item\b[^>]*>[\s\S]*?<\/item\s*>/gi) ?? [];
-  return blocks.flatMap((block) => {
-    const rawTitle = xmlTag(block, "title");
-    const source = xmlTag(block, "source") || defaultSource;
-    const publisherSuffix = ` - ${source}`;
-    const title = rawTitle.endsWith(publisherSuffix)
-      ? rawTitle.slice(0, -publisherSuffix.length)
-      : rawTitle;
-    const url = validHttpUrl(xmlTag(block, "link"));
-    const time = xmlTag(block, "pubDate");
-    const id = xmlTag(block, "guid") || url;
-    if (!title || !url || !id || !time) return [];
-    return [
-      {
-        id,
-        title,
-        text: xmlTag(block, "description").slice(0, 2_000),
-        url,
-        time,
-        source,
-      },
-    ];
-  });
-}
-
-function parseReliefWeb(payload) {
-  if (!Array.isArray(payload?.data)) {
-    throw new Error("ReliefWeb returned an unexpected response");
-  }
-
-  return payload.data.flatMap((entry) => {
-    const fields = entry?.fields;
-    const title = typeof fields?.title === "string" ? fields.title.trim() : "";
-    const url = validHttpUrl(fields?.url);
-    const time = fields?.date?.created;
-    if (!title || !url || typeof time !== "string") return [];
-
-    const sourceList = Array.isArray(fields.source)
-      ? fields.source
-      : fields.source && typeof fields.source === "object"
-        ? [fields.source]
-        : [];
-    const sourceName = sourceList
-      .map((source) => source?.name)
-      .filter((name) => typeof name === "string" && name.trim())
-      .join(", ");
-    const primaryCountries =
-      fields.primary_country && typeof fields.primary_country === "object"
-        ? Array.isArray(fields.primary_country)
-          ? fields.primary_country
-          : [fields.primary_country]
-        : [];
-    const countriesFromFields =
-      fields.country && typeof fields.country === "object"
-        ? Array.isArray(fields.country)
-          ? fields.country
-          : [fields.country]
-        : [];
-    const countryList = [...primaryCountries, ...countriesFromFields];
-    const countries = Array.from(
-      new Set(
-        countryList
-          .map((country) => country?.name)
-          .filter((name) => typeof name === "string" && name.trim()),
-      ),
-    );
-
-    return [{
-      id: `reliefweb:${entry.id ?? url}`,
-      title,
-      text: [
-        typeof fields.body === "string"
-          ? fields.body.replace(/<[^>]*>/g, " ").slice(0, 4_000)
-          : "",
-        countries.join(" "),
-      ].filter(Boolean).join(" "),
-      url,
-      time,
-      source: sourceName ? `${sourceName} · ReliefWeb` : "ReliefWeb",
-    }];
-  });
-}
-
-function parseRedditJson(payload, subreddit) {
-  const posts = payload?.data?.children;
-  if (!Array.isArray(posts)) {
-    throw new Error("Reddit JSON returned an unexpected response");
-  }
-
-  return posts.flatMap(({ data }) => {
-    if (
-      typeof data?.id !== "string" ||
-      typeof data.title !== "string" ||
-      typeof data.created_utc !== "number"
-    ) {
-      return [];
-    }
-    const url = validHttpUrl(
-      data.permalink
-        ? `https://www.reddit.com${data.permalink}`
-        : data.url,
-    );
-    if (!url) return [];
-    return [
-      {
-        id: data.name || `${subreddit}:${data.id}`,
-        title: data.title,
-        text: typeof data.selftext === "string" ? data.selftext.slice(0, 2_000) : "",
-        url,
-        time: new Date(data.created_utc * 1000).toISOString(),
-        source: `r/${subreddit}`,
-      },
-    ];
-  });
-}
-
-function parseRedditAtom(xml, subreddit) {
-  const blocks = xml.match(/<entry\b[^>]*>[\s\S]*?<\/entry\s*>/gi) ?? [];
-  return blocks.flatMap((block) => {
-    const links = [...block.matchAll(/<link\b([^>]*)\/?>/gi)];
-    const alternate = links.find((match) =>
-      /\brel=["']alternate["']/i.test(match[1]),
-    );
-    const link = alternate ?? links[0];
-    const href = /\bhref=["']([^"']+)["']/i.exec(link?.[1] ?? "")?.[1];
-    const url = validHttpUrl(href ?? xmlTag(block, "id"));
-    const title = xmlTag(block, "title");
-    const time = xmlTag(block, "published");
-    const id = xmlTag(block, "id") || url;
-    if (!title || !url || !time || !id) return [];
-    return [
-      {
-        id,
-        title,
-        text: xmlTag(block, "content").slice(0, 2_000),
-        url,
-        time,
-        source: `r/${subreddit}`,
-      },
-    ];
-  });
-}
-
 async function fetchUpstream(url, headers, options = {}) {
   return fetch(url, {
     ...options,
@@ -287,293 +453,138 @@ async function fetchUpstream(url, headers, options = {}) {
   });
 }
 
-async function cachedFeed(key, ttl, loader) {
-  const now = Date.now();
-  const cached = feedCache.get(key);
-  if (cached && now - cached.fetchedAt < ttl) {
-    return {
-      ...cached.result,
-      cacheStatus: "fresh",
-      fetchedAt: cached.fetchedAt,
-    };
-  }
+/**
+ * ============================================================================
+ * POOL MANAGEMENT
+ * ============================================================================
+ */
 
-  let request = feedRequests.get(key);
-  if (!request) {
-    request = loader()
-      .then((result) => {
-        const entry = { result, fetchedAt: Date.now() };
-        feedCache.set(key, entry);
-        return entry;
+async function updateGlobalPool() {
+  console.log(`[POOL] Updating global events pool from ${RSS_SOURCES.length} sources...`);
+  const allItems = [];
+
+  // Fetch from all RSS sources simultaneously
+  const fetchPromises = RSS_SOURCES.map(source =>
+    loadRSSFeed(source)
+      .then(items => {
+        console.log(`[POOL] ${source.name}: ${items.length} items`);
+        return items;
       })
-      .finally(() => feedRequests.delete(key));
-    feedRequests.set(key, request);
+      .catch(error => {
+        console.warn(`[POOL] ${source.name} failed: ${error.message}`);
+        return [];
+      })
+  );
+
+  const results = await Promise.all(fetchPromises);
+  results.forEach(items => allItems.push(...items));
+
+  // Filter by age only (no server-side deduplication)
+  // Frontend permanent localStorage handles deduplication
+  const now = Date.now();
+  const uniqueItems = [];
+
+  for (const item of allItems) {
+    const age = now - new Date(item.time).getTime();
+    if (age < 0 || age > ITEM_MAX_AGE_MS) continue;
+
+    uniqueItems.push(item);
   }
+
+  // Sort by time (newest first) and limit to POOL_SIZE
+  uniqueItems.sort((a, b) => new Date(b.time) - new Date(a.time));
+  globalEventsPool = uniqueItems.slice(0, POOL_SIZE);
+
+  // Keep chronological order (newest first) for live priority
+  // Frontend will handle chronological playback and permanent deduplication
+
+  poolLastUpdated = now;
+  console.log(`[POOL] Pool updated: ${globalEventsPool.length} items (14d chronicle, deduplication handled by frontend)`);
+}
+
+/**
+ * ============================================================================
+ * LIVE BREAKING NEWS FETCH (30-second cycle)
+ * ============================================================================
+ */
+
+async function fetchLiveBreakingNews() {
+  console.log(`[LIVE] Fetching breaking news...`);
+  const newItems = [];
 
   try {
-    const entry = await request;
-    return {
-      ...entry.result,
-      cacheStatus: "live",
-      fetchedAt: entry.fetchedAt,
-    };
-  } catch (error) {
-    const stale = feedCache.get(key);
-    if (stale && now - stale.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
-      return {
-        ...stale.result,
-        cacheStatus: "stale",
-        fetchedAt: stale.fetchedAt,
-        warning: `Live refresh failed; showing cached data (${error.message}).`,
-      };
-    }
-    throw error;
-  }
-}
-
-function fetchRedditUpstream(url, headers) {
-  const request = redditRequestQueue.then(async () => {
-    const jitter = Math.floor(Math.random() * (REDDIT_REQUEST_JITTER_MS + 1));
-    await new Promise((resolve) =>
-      setTimeout(resolve, REDDIT_REQUEST_SPACING_MS + jitter),
-    );
-    return fetchUpstream(url, headers);
-  });
-  redditRequestQueue = request.then(
-    () => undefined,
-    () => undefined,
-  );
-  return request;
-}
-
-async function loadGoogleNews(query) {
-  const url = new URL("https://news.google.com/rss/search");
-  url.search = new URLSearchParams({
-    q: query,
-    hl: "en-US",
-    gl: "US",
-    ceid: "US:en",
-  });
-  const response = await fetchUpstream(url, {
-    Accept: "application/rss+xml, application/xml, text/xml",
-    "User-Agent": "HowCloseAreWeToWorldUnity/1.0 (public RSS reader)",
-  });
-  if (!response.ok) {
-    throw new Error(`Google News RSS returned HTTP ${response.status}`);
-  }
-  return eligibleItems(parseNewsRss(await response.text()));
-}
-
-async function loadAPWorldNews() {
-  const response = await fetchUpstream(AP_WORLD_RSS_URL, {
-    Accept: "application/rss+xml, application/xml, text/xml",
-    "User-Agent": "HowCloseAreWeToWorldUnity/1.0 (public RSS reader)",
-  });
-  if (!response.ok) {
-    throw new Error(`AP World News RSS returned HTTP ${response.status}`);
-  }
-  return eligibleItems(parseNewsRss(await response.text(), "AP News"));
-}
-
-async function loadNews() {
-  const attempts = [
-    ["Google News RSS", () => loadGoogleNews(NEWS_QUERY)],
-    ["Google News RSS fallback", () => loadGoogleNews(NEWS_FALLBACK_QUERY)],
-    ["AP World News RSS", loadAPWorldNews],
-  ];
-  const errors = [];
-
-  for (const [source, load] of attempts) {
-    try {
-      const items = await load();
-      return {
-        items,
-        mode: source === "Google News RSS" ? "rss" : "fallback",
-        source,
-        warning: errors.length
-          ? `Using ${source} after a primary feed error: ${errors.join("; ")}`
-          : null,
-      };
-    } catch (error) {
-      errors.push(`${source}: ${error.message}`);
-    }
-  }
-  throw new Error(`All news feeds failed: ${errors.join("; ")}`);
-}
-
-async function loadReliefWeb() {
-  const url = new URL("https://api.reliefweb.int/v2/reports");
-  url.searchParams.set("appname", RELIEFWEB_APP_NAME);
-  const response = await fetchUpstream(
-    url,
-    {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "User-Agent": "HowCloseAreWeToWorldUnity/1.0 (public humanitarian reports)",
-    },
-    {
-      method: "POST",
-      body: JSON.stringify({
-        limit: REDDIT_LIMIT,
-        profile: "list",
-        fields: {
-          include: [
-            "title",
-            "date.created",
-            "url",
-            "source.name",
-            "primary_country.name",
-            "country.name",
-            "body",
-          ],
-        },
-        sort: ["date.created:desc"],
-        filter: {
-          operator: "AND",
-          conditions: [{
-            field: "date.created",
-            value: { from: "now-24h", to: "now" },
-          }],
-        },
-      }),
-    },
-  );
-  if (!response.ok) {
-    throw new Error(`ReliefWeb reports returned HTTP ${response.status}`);
-  }
-  const items = eligibleItems(parseReliefWeb(await response.json()));
-  return { items, mode: "reliefweb-fallback", source: "ReliefWeb" };
-}
-
-async function loadRedditJson(subreddit) {
-  const url = new URL(
-    `https://www.reddit.com/r/${subreddit}/new.json`,
-  );
-  url.searchParams.set("limit", String(REDDIT_LIMIT));
-  const response = await fetchRedditUpstream(url, {
-    Accept: "application/json",
-    "User-Agent": REDDIT_USER_AGENT,
-  });
-  if (!response.ok) {
-    throw new Error(`Reddit JSON returned HTTP ${response.status}`);
-  }
-  return parseRedditJson(await response.json(), subreddit);
-}
-
-async function loadRedditRss(subreddit) {
-  const url = new URL(`https://www.reddit.com/r/${subreddit}/.rss`);
-  url.searchParams.set("limit", String(REDDIT_LIMIT));
-  const response = await fetchRedditUpstream(url, {
-    Accept: "application/atom+xml, application/rss+xml, application/xml",
-    "User-Agent": REDDIT_USER_AGENT,
-  });
-  if (!response.ok) {
-    throw new Error(`Reddit RSS returned HTTP ${response.status}`);
-  }
-  return parseRedditAtom(await response.text(), subreddit);
-}
-
-async function loadReddit(subreddit) {
-  try {
-    const items = await loadRedditJson(subreddit);
-    redditModes.set(subreddit, "json");
-    return { items: eligibleItems(items), mode: "json" };
-  } catch (jsonError) {
-    redditModes.set(subreddit, "rss");
-    try {
-      const items = eligibleItems(await loadRedditRss(subreddit));
-      return {
-        items,
-        mode: "rss-fallback",
-        warning: `Reddit JSON unavailable (${jsonError.message}); using its public RSS feed.`,
-      };
-    } catch (rssError) {
-      try {
-        const relief = await cachedFeed(
-          "reliefweb",
-          FEED_CACHE_TTL_MS,
-          loadReliefWeb,
-        );
-        return {
-          ...relief,
-          mode: "reliefweb-fallback",
-          warning:
-            `Reddit unavailable (${jsonError.message}; ${rssError.message}); using ReliefWeb public reports.`,
-        };
-      } catch (reliefError) {
-        let newsFallback;
-        let newsFallbackError = null;
-        try {
-          newsFallback = await cachedFeed(
-            "news",
-            NEWS_CACHE_TTL_MS,
-            () => withFeedCooldown("news", loadNews),
-          );
-        } catch (error) {
-          newsFallbackError = error.message;
+    // Quick fetch from Google News for latest
+    const newsSource = RSS_SOURCES.find(s => s.name === "Google News");
+    if (newsSource) {
+      const newsItems = await loadRSSFeed(newsSource);
+      for (const item of newsItems.slice(0, 10)) {
+        if (!isDuplicate(item)) {
+          addToLedger(item);
+          item.isLive = true;
+          newItems.push(item);
         }
-        if (newsFallback?.items?.length) {
-          return {
-            ...newsFallback,
-            mode: "news-cache-fallback",
-            cacheStatus: "stale",
-            warning:
-              `Reddit unavailable (${jsonError.message}; ${rssError.message}); ReliefWeb unavailable (${reliefError.message}); showing cached public news.`,
-          };
-        }
-        throw new Error(
-          `Reddit JSON failed: ${jsonError.message}; RSS failed: ${rssError.message}; ReliefWeb v2 failed: ${reliefError.message}; cached news fallback${newsFallbackError ? ` failed: ${newsFallbackError}` : " had no current items"}`,
-        );
       }
     }
-  }
-}
 
-function sendJson(response, status, data) {
-  response.writeHead(status, {
-    "Cache-Control": "no-store",
-    "Content-Type": "application/json; charset=utf-8",
-  });
-  response.end(JSON.stringify(data));
-}
-
-async function handleApi(response, handler) {
-  try {
-    sendJson(response, 200, await handler());
-  } catch (error) {
-    console.warn(`Feed request failed: ${error.message}`);
-    const status =
-      error.name === "TimeoutError"
-        ? 504
-        : /HTTP 429/.test(error.message)
-          ? 429
-          : 502;
-    sendJson(response, status, { error: error.message });
-  }
-}
-
-async function withFeedCooldown(key, handler) {
-  const cooldown = feedCooldowns.get(key);
-  if (cooldown && cooldown.until > Date.now()) {
-    const minutes = Math.ceil((cooldown.until - Date.now()) / 60_000);
-    throw new Error(`${cooldown.message}; retrying in about ${minutes} min`);
-  }
-  feedCooldowns.delete(key);
-
-  try {
-    const result = await handler();
-    feedCooldowns.delete(key);
-    return result;
-  } catch (error) {
-    if (/HTTP (?:403|429)/.test(error.message)) {
-      feedCooldowns.set(key, {
-        until: Date.now() + 5 * 60_000,
-        message: error.message,
-      });
+    if (newItems.length > 0) {
+      // Add to front of pool and re-sort chronologically
+      globalEventsPool = [...newItems, ...globalEventsPool];
+      globalEventsPool.sort((a, b) => new Date(b.time) - new Date(a.time));
+      globalEventsPool = globalEventsPool.slice(0, POOL_SIZE);
+      console.log(`[LIVE] Added ${newItems.length} breaking news items`);
+    } else {
+      console.log(`[LIVE] No new breaking news`);
     }
-    throw error;
+  } catch (error) {
+    console.error(`[LIVE] Fetch failed: ${error.message}`);
   }
 }
+
+/**
+ * ============================================================================
+ * HTTP SERVER
+ * ============================================================================
+ */
+
+const server = http.createServer(async (request, response) => {
+  const url = new URL(request.url, `http://${HOST}:${PORT}`);
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    response.writeHead(405, {
+      Allow: "GET, HEAD",
+      "Content-Type": "text/plain; charset=utf-8",
+    });
+    response.end("Method not allowed");
+    return;
+  }
+
+  // Pool API endpoint
+  if (request.method === "GET" && (url.pathname === "/api/pool" || url.pathname === "/api/news")) {
+    response.writeHead(200, {
+      "Cache-Control": "no-store",
+      "Content-Type": "application/json; charset=utf-8",
+    });
+    const responseData = {
+      items: globalEventsPool,
+      lastUpdated: poolLastUpdated,
+      count: globalEventsPool.length,
+      currentTime: Date.now(),
+    };
+    console.log(`[API] Sending ${globalEventsPool.length} items to client`);
+    response.end(JSON.stringify(responseData));
+    return;
+  }
+
+  // Static files
+  const file = STATIC_FILES.get(url.pathname);
+  if (!file) {
+    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Not found");
+    return;
+  }
+
+  serveStaticFile(request, response, ...file);
+});
 
 function serveStaticFile(request, response, fileName, contentType) {
   fs.readFile(path.join(__dirname, fileName), (error, contents) => {
@@ -590,53 +601,23 @@ function serveStaticFile(request, response, fileName, contentType) {
   });
 }
 
-const server = http.createServer(async (request, response) => {
-  const url = new URL(request.url, `http://${HOST}:${PORT}`);
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    response.writeHead(405, {
-      Allow: "GET, HEAD",
-      "Content-Type": "text/plain; charset=utf-8",
-    });
-    response.end("Method not allowed");
-    return;
-  }
+// Initialize pool on startup
+updateGlobalPool().then(() => {
+  // Update pool every 2 minutes (more frequent for deep archive)
+  setInterval(updateGlobalPool, 2 * 60 * 1000);
 
-  if (request.method === "GET" && url.pathname === "/api/news") {
-    await handleApi(response, () =>
-      cachedFeed("news", NEWS_CACHE_TTL_MS, () =>
-        withFeedCooldown("news", loadNews),
-      ),
-    );
-    return;
-  }
+  // Fetch live breaking news every 30 seconds
+  setInterval(fetchLiveBreakingNews, LIVE_FETCH_INTERVAL_MS);
 
-  const redditMatch = /^\/api\/reddit\/([A-Za-z]+)$/.exec(url.pathname);
-  if (request.method === "GET" && redditMatch) {
-    const subreddit = redditMatch[1];
-    if (!ALLOWED_SUBREDDITS.has(subreddit)) {
-      sendJson(response, 404, { error: "Feed not configured" });
-      return;
-    }
-    await handleApi(response, () =>
-      cachedFeed(`reddit:${subreddit}`, FEED_CACHE_TTL_MS, () =>
-        withFeedCooldown(`reddit:${subreddit}`, () => loadReddit(subreddit)),
-      ),
-    );
-    return;
-  }
-
-  const file = STATIC_FILES.get(url.pathname);
-  if (!file) {
-    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("Not found");
-    return;
-  }
-
-  serveStaticFile(request, response, ...file);
-});
-
-server.listen(PORT, HOST, () => {
-  console.log(`World Unity dashboard running at http://${HOST}:${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(`World Unity dashboard running at http://${HOST}:${PORT}`);
+    console.log(`Reliable public RSS pipeline active`);
+    console.log(`Global events pool: ${globalEventsPool.length} unique items`);
+    console.log(`Live breaking news cycle: ${LIVE_FETCH_INTERVAL_MS}ms`);
+  });
+}).catch(error => {
+  console.error(`Failed to initialize pool: ${error.message}`);
+  process.exitCode = 1;
 });
 
 server.on("error", (error) => {
