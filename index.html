@@ -14,6 +14,18 @@
     <script src="script.js" defer></script>
   </head>
   <body>
+    <div id="about-page" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #060913; z-index: 1000; overflow-y: auto; padding: 3rem 1.5rem;">
+      <div style="max-width: 650px; margin: 0 auto; background: rgba(13, 20, 38, 0.45); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 2.5rem;">
+        <a href="#" id="back-to-home" style="display: inline-block; color: #9aa5b8; text-decoration: none; font-size: 12px; margin-bottom: 2rem; text-transform: uppercase; letter-spacing: 0.05em;">&larr; Back to Live Index</a>
+        <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 1.5rem; letter-spacing: -0.01em; border-bottom: 1px solid rgba(255, 255, 255, 0.07); padding-bottom: 0.75rem; color: #f0f3fa;">My Story: Why I Started This Project</h2>
+        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">My name is <strong style="color: #f0f3fa;">Rodric Longonje</strong>. I am a 17-year-old high school student, and this entire project started on an ordinary day while I was sitting in class.</p>
+        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">I was looking around, thinking about the deep divisions in our society—the racism, the cultural fractures, and how heavily we as people tend to segregate and isolate ourselves from one another. It made me wonder why it is so incredibly difficult for humanity to just be kind, to show genuine care, and to accept us all for what we truly are: one single human family. I sat there and asked myself a simple question: <em>"How close are we to true world unity?"</em></p>
+        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">I pulled up Google on my school computer, searching for a real answer, an index, or a tracker that could tell me where humanity stood. But I didn't get an answer. Everything online was either cold geopolitical analysis tracking wars, or superficial data that meant nothing. There was no real-time ledger tracking the collective goodness of the planet. So, I decided to build this website to answer my own question.</p>
+        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">I built this dashboard to be an uncompromisingly honest, real-time chronicle of humanity's heart. I refused to create something fake or "vibecoded" that lies to make people feel better. Every headline sliding across this terminal is a verified, real-world act of global cooperation, international aid, or community selflessness.</p>
+        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">Because true world peace is a monumental mountain to climb, the math here is bound to the massive gravity of 8 billion people. It requires an immense wave of collective human kindness to shift our master index forward. This project stands as proof that while the journey is slow and incredibly difficult, humanity is crawling toward oneness—one microscopic, hard-earned step at a time.</p>
+        <p style="font-style: italic; color: #64748b; margin-top: 2rem; font-size: 14px;">&mdash; Rodric Longonje, Founder & Developer</p>
+      </div>
+    </div>
     <div class="globe-backdrop" aria-hidden="true">
       <div
         id="connection-map"
@@ -32,7 +44,7 @@
       <section class="sticky-hero" aria-label="World unity index and place search">
         <header class="info-header">
           <div class="title-block">
-            <p class="info-eyebrow">A live index · public reports · rolling 24 hours</p>
+            <p class="info-eyebrow">A live index · public reports · rolling 24 hours · <a href="http://127.0.0.1:8765/about.html" class="nav-link-inline">About</a></p>
             <h1 class="page-title">HOW CLOSE ARE WE TO WORLD UNITY?</h1>
           </div>
           <div class="hero-actions">
@@ -40,16 +52,6 @@
               <span class="live-dot" aria-hidden="true"></span>
               <span id="live-label">CONNECTING TO PUBLIC FEEDS</span>
             </div>
-            <button
-              class="pause-button"
-              id="pause-map"
-              type="button"
-              aria-label="Pause globe rotation"
-              aria-pressed="false"
-            >
-              <span aria-hidden="true">Ⅱ</span>
-              <span class="visually-hidden">Pause globe rotation</span>
-            </button>
           </div>
         </header>
 
@@ -130,77 +132,6 @@
           <button type="button" data-region="africa" aria-pressed="false">Africa</button>
           <button type="button" data-region="asia" aria-pressed="false">Asia</button>
           <button type="button" data-region="oceania" aria-pressed="false">Oceania</button>
-        </div>
-        <div class="signal-controls" aria-label="Map signal layers">
-          <label class="signal-control" for="signal-community">
-            <span class="signal-name"><i class="signal-dot"></i>Community</span>
-            <input id="signal-community" type="range" min="0" max="100" value="100" data-signal-layer="micro-good-deed" aria-label="Community signal visibility">
-            <output for="signal-community">100%</output>
-          </label>
-          <label class="signal-control" for="signal-major">
-            <span class="signal-name"><i class="signal-dot"></i>Major stories</span>
-            <input id="signal-major" type="range" min="0" max="100" value="100" data-signal-layer="major-news" aria-label="Major story signal visibility">
-            <output for="signal-major">100%</output>
-          </label>
-          <label class="signal-control" for="signal-milestone">
-            <span class="signal-name"><i class="signal-dot"></i>Treaties</span>
-            <input id="signal-milestone" type="range" min="0" max="100" value="100" data-signal-layer="global-milestone" aria-label="Treaty signal visibility">
-            <output for="signal-milestone">100%</output>
-          </label>
-        </div>
-        <p class="globe-disclaimer">
-          Lines are schematic links inferred from report text, not verified routes.
-        </p>
-      </section>
-
-      <section class="metric-strip" aria-label="Live summary metrics">
-        <article class="metric-cell">
-          <p class="metric-label">Treaty-related reports</p>
-          <p class="metric-value" id="accord-count">—</p>
-          <p class="metric-note" id="accord-note">Keyword matches · not verified accords</p>
-        </article>
-        <article class="metric-cell">
-          <p class="metric-label">CO₂ reduction</p>
-          <p class="metric-value metric-unavailable" id="co2-value">—</p>
-          <p class="metric-note" id="co2-note">No verified live CO₂ measure in these feeds</p>
-        </article>
-        <article class="metric-cell">
-          <p class="metric-label">Index</p>
-          <p class="metric-value" id="peace-score">8.4200%</p>
-          <p class="metric-note">Project-set and not independently measured</p>
-        </article>
-      </section>
-
-      <section class="source-status" aria-label="Public source status" aria-live="polite">
-        <div class="source-chip" id="source-news" data-state="loading">
-          <span class="source-dot" aria-hidden="true"></span>
-          <span class="source-name">Google News RSS · AP/Reuters query</span>
-          <span class="source-state">CONNECTING</span>
-        </div>
-        <div class="source-chip" id="source-uplifting" data-state="loading">
-          <span class="source-dot" aria-hidden="true"></span>
-          <span class="source-name">r/UpliftingNews</span>
-          <span class="source-state">CONNECTING</span>
-        </div>
-        <div class="source-chip" id="source-kindness" data-state="loading">
-          <span class="source-dot" aria-hidden="true"></span>
-          <span class="source-name">r/RandomActsOfKindness</span>
-          <span class="source-state">CONNECTING</span>
-        </div>
-        <div class="source-chip" id="source-assistance" data-state="loading">
-          <span class="source-dot" aria-hidden="true"></span>
-          <span class="source-name">r/Assistance</span>
-          <span class="source-state">CONNECTING</span>
-        </div>
-        <div class="source-chip" id="source-smile" data-state="loading">
-          <span class="source-dot" aria-hidden="true"></span>
-          <span class="source-name">r/MadeMeSmile</span>
-          <span class="source-state">CONNECTING</span>
-        </div>
-        <div class="source-chip" id="source-charity" data-state="loading">
-          <span class="source-dot" aria-hidden="true"></span>
-          <span class="source-name">r/Charity</span>
-          <span class="source-state">CONNECTING</span>
         </div>
       </section>
 
@@ -298,5 +229,17 @@
         <span>Satellite imagery · Blue Marble</span>
       </footer>
     </main>
+    <script>
+      document.querySelectorAll('.nav-link, .nav-link-inline').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          document.getElementById('about-page').style.display = 'block';
+        });
+      });
+      document.getElementById('back-to-home').addEventListener('click', function(e) {
+        e.preventDefault();
+        document.getElementById('about-page').style.display = 'none';
+      });
+    </script>
   </body>
 </html>

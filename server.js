@@ -9,7 +9,7 @@ const path = require("node:path");
 
 // Configuration
 const HOST = process.env.HOST || "127.0.0.1";
-const PORT = Number(process.env.PORT || 8765);
+const PORT = Number(process.env.PORT || 59282);
 const REQUEST_TIMEOUT_MS = 12_000;
 const RELIEFWEB_APP_NAME = process.env.RELIEFWEB_APP_NAME || "worldunity";
 const POOL_SIZE = 500;
@@ -32,6 +32,7 @@ const STATIC_FILES = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
+  ["/about.html", ["about.html", "text/html; charset=utf-8"]],
   ["/script.js", ["script.js", "text/javascript; charset=utf-8"]],
 ]);
 
@@ -577,6 +578,7 @@ const server = http.createServer(async (request, response) => {
 
   // Static files
   const file = STATIC_FILES.get(url.pathname);
+  console.log(`[STATIC] Request for: ${url.pathname}, file found: ${!!file}`);
   if (!file) {
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Not found");
@@ -587,12 +589,16 @@ const server = http.createServer(async (request, response) => {
 });
 
 function serveStaticFile(request, response, fileName, contentType) {
-  fs.readFile(path.join(__dirname, fileName), (error, contents) => {
+  const filePath = path.join(__dirname, fileName);
+  console.log(`[STATIC] Reading file: ${filePath}`);
+  fs.readFile(filePath, (error, contents) => {
     if (error) {
+      console.error(`[STATIC] Error reading file: ${error.message}`);
       response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
       response.end(`Could not read ${fileName}: ${error.message}`);
       return;
     }
+    console.log(`[STATIC] Successfully served: ${fileName} (${contents.length} bytes)`);
     response.writeHead(200, {
       "Cache-Control": "no-store",
       "Content-Type": contentType,

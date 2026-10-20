@@ -482,11 +482,11 @@ async function initialize() {
     const world = Globe()(mapElement)
       .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
       .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-      .backgroundImageUrl(null); // Keep background transparent to black canvas
+      .backgroundImageUrl(null) // Keep background transparent to black canvas;
 
-    // Set smooth auto-rotation and camera parameters
+    // Enable auto-rotation and controls
     world.controls().autoRotate = true;
-    world.controls().autoRotateSpeed = 0.5;
+    world.controls().autoRotateSpeed = 1.5;
     world.controls().enableZoom = true;
 
     // Auto-adjust size to match full screen boundaries perfectly
