@@ -10,7 +10,7 @@ const path = require("node:path");
 // Configuration
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 59282);
-const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 const RELIEFWEB_APP_NAME = process.env.RELIEFWEB_APP_NAME || "worldunity";
 const POOL_SIZE = 500;
 const ITEM_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 14 days for deep fallback
@@ -32,8 +32,10 @@ const STATIC_FILES = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
-  ["/about.html", ["about.html", "text/html; charset=utf-8"]],
   ["/script.js", ["script.js", "text/javascript; charset=utf-8"]],
+  ["/privacy.html", ["privacy.html", "text/html; charset=utf-8"]],
+  ["/terms.html", ["terms.html", "text/html; charset=utf-8"]],
+  ["/contact.html", ["contact.html", "text/html; charset=utf-8"]],
 ]);
 
 /**

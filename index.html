@@ -14,18 +14,6 @@
     <script src="script.js" defer></script>
   </head>
   <body>
-    <div id="about-page" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #060913; z-index: 1000; overflow-y: auto; padding: 3rem 1.5rem;">
-      <div style="max-width: 650px; margin: 0 auto; background: rgba(13, 20, 38, 0.45); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 2.5rem;">
-        <a href="#" id="back-to-home" style="display: inline-block; color: #9aa5b8; text-decoration: none; font-size: 12px; margin-bottom: 2rem; text-transform: uppercase; letter-spacing: 0.05em;">&larr; Back to Live Index</a>
-        <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 1.5rem; letter-spacing: -0.01em; border-bottom: 1px solid rgba(255, 255, 255, 0.07); padding-bottom: 0.75rem; color: #f0f3fa;">My Story: Why I Started This Project</h2>
-        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">My name is <strong style="color: #f0f3fa;">Rodric Longonje</strong>. I am a 17-year-old high school student, and this entire project started on an ordinary day while I was sitting in class.</p>
-        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">I was looking around, thinking about the deep divisions in our society—the racism, the cultural fractures, and how heavily we as people tend to segregate and isolate ourselves from one another. It made me wonder why it is so incredibly difficult for humanity to just be kind, to show genuine care, and to accept us all for what we truly are: one single human family. I sat there and asked myself a simple question: <em>"How close are we to true world unity?"</em></p>
-        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">I pulled up Google on my school computer, searching for a real answer, an index, or a tracker that could tell me where humanity stood. But I didn't get an answer. Everything online was either cold geopolitical analysis tracking wars, or superficial data that meant nothing. There was no real-time ledger tracking the collective goodness of the planet. So, I decided to build this website to answer my own question.</p>
-        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">I built this dashboard to be an uncompromisingly honest, real-time chronicle of humanity's heart. I refused to create something fake or "vibecoded" that lies to make people feel better. Every headline sliding across this terminal is a verified, real-world act of global cooperation, international aid, or community selflessness.</p>
-        <p style="color: #9aa5b8; font-size: 15px; margin-bottom: 1.25rem; line-height: 1.7;">Because true world peace is a monumental mountain to climb, the math here is bound to the massive gravity of 8 billion people. It requires an immense wave of collective human kindness to shift our master index forward. This project stands as proof that while the journey is slow and incredibly difficult, humanity is crawling toward oneness—one microscopic, hard-earned step at a time.</p>
-        <p style="font-style: italic; color: #64748b; margin-top: 2rem; font-size: 14px;">&mdash; Rodric Longonje, Founder & Developer</p>
-      </div>
-    </div>
     <div class="globe-backdrop" aria-hidden="true">
       <div
         id="connection-map"
@@ -38,13 +26,12 @@
         <a href="https://github.com/vasturiano/three-globe" target="_blank" rel="noopener noreferrer">three-globe</a>
       </p>
     </div>
-    <div class="backdrop-shade" aria-hidden="true"></div>
 
     <main class="app-shell">
       <section class="sticky-hero" aria-label="World unity index and place search">
         <header class="info-header">
           <div class="title-block">
-            <p class="info-eyebrow">A live index · public reports · rolling 24 hours · <a href="http://127.0.0.1:8765/about.html" class="nav-link-inline">About</a></p>
+            <p class="info-eyebrow">A live index · public reports · rolling 24 hours</p>
             <h1 class="page-title">HOW CLOSE ARE WE TO WORLD UNITY?</h1>
           </div>
           <div class="hero-actions">
@@ -82,27 +69,6 @@
             <span id="last-updated">Loading live stream...</span>
           </div>
         </section>
-
-        <form class="place-search-form" id="place-search-form" role="search">
-          <label class="visually-hidden" for="place-search">Search a place or address</label>
-          <span class="search-icon" aria-hidden="true">⌕</span>
-          <input
-            id="place-search"
-            name="place"
-            type="search"
-            placeholder="Search a place or address"
-            autocomplete="off"
-            maxlength="200"
-            aria-controls="place-search-results"
-            aria-describedby="place-search-status place-search-attribution"
-          >
-          <button type="submit">Search</button>
-          <p class="place-search-status" id="place-search-status" role="status" aria-live="polite"></p>
-          <p class="place-search-attribution" id="place-search-attribution">
-            Place search by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
-          </p>
-          <ol class="place-search-results" id="place-search-results" aria-label="Place search results"></ol>
-        </form>
       </section>
 
       <section class="activity-panel" aria-labelledby="activity-title">
@@ -199,47 +165,26 @@
         </div>
       </section>
 
-      <section class="story-panel" aria-labelledby="story-title">
-        <header class="content-section-heading">
-          <p class="section-kicker">THE PERSON BEHIND THE PROJECT</p>
-          <h2 id="story-title">My Story: Why I Started This Project</h2>
-          <p>A personal note about the question that started this work.</p>
-        </header>
-        <article class="story-card">
-          <div class="story-mark" aria-hidden="true">●</div>
-          <div class="story-copy">
-            <h3>Your story begins here</h3>
-            <p class="story-placeholder">
-              Add your own introduction: what made you wonder how close we are
-              to world unity, and what you hope this project can help people
-              see.
-            </p>
-            <p class="story-placeholder">
-              You can share the choices behind building a careful, uninflated
-              tracker—and the experiences or questions that shaped your
-              perspective. Replace this placeholder with your own words when
-              you are ready.
-            </p>
-          </div>
-        </article>
-      </section>
-
       <footer class="page-footer">
+        <span>
+          <a href="privacy.html">Privacy Policy</a> ·
+          <a href="terms.html">Terms of Service</a> ·
+          <a href="contact.html">Contact</a>
+        </span>
         <span>Public feeds · Browser-local tally · No analytics</span>
         <span>Satellite imagery · Blue Marble</span>
       </footer>
+
+      <section class="philosophy-panel" style="margin-top: 24px;">
+        <p style="color: var(--quiet); font-size: 9px; margin: 0;">
+          <strong>Disclaimer:</strong> This site displays news headlines from third-party RSS feeds for informational purposes only. Headlines are not independently verified and may contain errors. Content belongs to respective sources.
+        </p>
+      </section>
+
+      <div class="ad-wrapper">
+        <script async="async" data-cfasync="false" src="https://bauval.org/21/eaa0cb5d3fc2a2bf818f5069d3db89fc"></script>
+        <div id="container-eaa0cb5d3fc2a2bf818f5069d3db89fc"></div>
+      </div>
     </main>
-    <script>
-      document.querySelectorAll('.nav-link, .nav-link-inline').forEach(function(link) {
-        link.addEventListener('click', function(e) {
-          e.preventDefault();
-          document.getElementById('about-page').style.display = 'block';
-        });
-      });
-      document.getElementById('back-to-home').addEventListener('click', function(e) {
-        e.preventDefault();
-        document.getElementById('about-page').style.display = 'none';
-      });
-    </script>
   </body>
 </html>

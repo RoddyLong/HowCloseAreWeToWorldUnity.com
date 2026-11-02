@@ -20,10 +20,6 @@ const elements = {
   pollStatus: document.querySelector("#poll-status"),
   connectionMap: document.querySelector("#connection-map"),
   pauseMap: document.querySelector("#pause-map"),
-  placeSearchForm: document.querySelector("#place-search-form"),
-  placeSearchInput: document.querySelector("#place-search"),
-  placeSearchStatus: document.querySelector("#place-search-status"),
-  placeSearchResults: document.querySelector("#place-search-results"),
   deltaNumber: document.querySelector("#delta-number"),
   accordCount: document.querySelector("#accord-count"),
   accordNote: document.querySelector("#accord-note"),
@@ -481,8 +477,10 @@ async function initialize() {
     // Initialize the official Globe.gl instance
     const world = Globe()(mapElement)
       .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-      .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-      .backgroundImageUrl(null) // Keep background transparent to black canvas;
+      .backgroundImageUrl(null)
+      .showGlobe(true)
+      .showAtmosphere(false)
+      .atmosphereColor(null);
 
     // Enable auto-rotation and controls
     world.controls().autoRotate = true;
